@@ -1,0 +1,4 @@
+------------------------------------------------------------------
+Important things to keep in mind:
+1) The previous versions of my web server are currently stored in previous_versions folder.
+2) The previous versions contain important informations, mostly the first, basic ways of handling the HTTP requests, and so on
