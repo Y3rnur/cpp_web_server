@@ -10,6 +10,8 @@
 #include <iomanip>
 #include <filesystem>
 #include <string>
+#include <chrono>
+#include <ctime>
 
 std::string getMimeType(const std::string& path) {
     if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html";
@@ -97,6 +99,44 @@ std::string handleSubmitFormRequest(const std::map<std::string, std::string>& he
                 "\r\n"
                 "Error reading from file\r\n";
     }
+}
+
+std::string handleAboutRequest(const std::map<std::string, std::string>& headers) {
+    std::cout << "Handling About page request..." << std::endl;
+
+    std::string about_content = readFile("about.html");
+    if (!about_content.empty()) {
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/html\r\n"
+               "Content-Length: " + std::to_string(about_content.length()) + "\r\n"
+               "\r\n"
+               + about_content + "\r\n";
+    } else {
+        return "HTTP/1.1 500 Internal Server Error\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Error reading from file\r\n";
+    }
+}
+
+std::string handleApiTimeRequest(const std::map<std::string, std::string>& headers) {
+    std::cout << "Handling API Time request..." << std::endl;
+
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm* ptm = std::gmtime(&now_c);
+
+    std::ostringstream oss;
+    oss << std::put_time(ptm, "%Y-%m-%dT%H:%M:%SZ");
+    std::string current_time_str = oss.str();
+
+    std::string json = "{\"server_time\": \"" + current_time_str + "\"}";
+    return "HTTP/1.1 200 OK\r\n"
+           "Content-Type: application/json\r\n"
+           "Content-Length: " + std::to_string(json.length()) + "\r\n"
+           "\r\n"
+           + json;
+
 }
 
 int main() {
@@ -260,28 +300,9 @@ int main() {
             } else if (method == "GET" && uri == "/submit_form") {
                 response = handleSubmitFormRequest(headers);
             } else if (method == "GET" && uri == "/about") {
-                std::string content = readFile("about.html");
-                if (!content.empty()) {
-                    response = "HTTP/1.1 200 OK\r\n"
-                               "Content-Type: text/html\r\n"
-                               "Content-Length: " + std::to_string(content.length()) + "\r\n"
-                               "\r\n"
-                               + content;
-                } else {
-                    response = "HTTP/1.1 500 Internal Server Error\r\n"
-                               "Content-Type: text/plain\r\n"
-                               "\r\n"
-                               "Error reading from file\r\n";
-                }
+                response = handleAboutRequest(headers);
             } else if (method == "GET" && uri == "/api/time") {
-                std::string current_time = "2025-05-10T22:12:50Z";
-                std::string json = "{\"server_time\": \"" + current_time + "\"}";
-
-                response = "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: application/json\r\n"
-                           "Content-Length: " + std::to_string(json.length()) + "\r\n"
-                           "\r\n"
-                           + json;
+                response = handleApiTimeRequest(headers);
             } else if (method == "GET" && startsWith(uri, "/static/")) {
                 std::string file_path = uri.substr(1);
                 std::string file_content = readFile(file_path);
