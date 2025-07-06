@@ -139,6 +139,76 @@ std::string handleApiTimeRequest(const std::map<std::string, std::string>& heade
 
 }
 
+std::string handleStaticFileRequest(const std::map<std::string, std::string>& headers, std::string uri) {
+    std::cout << "Handling static file request..." << std::endl;
+
+    std::string file_path = uri.substr(1);
+    std::string file_content = readFile(file_path);
+    if (!file_content.empty()) {
+        std::string mime_type = getMimeType(file_path);
+
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: " + mime_type + "\r\n"
+               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
+               "\r\n"
+               + file_content;
+    } else {
+        return "HTTP/1.1 404 Not Found\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "File not found.\r\n";
+    }
+}
+
+std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>& headers, const std::string& request_body) {
+    std::cout << "Handling POST data submission..." << std::endl;
+
+    if (request_body.empty()) {
+        std::cerr << "POST request received with empty body." << std::endl;
+        return "HTTP/1.1 400 Bad Request\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Bad Request: Empty POST body.\r\n";
+    }
+
+    std::istringstream body_stream(request_body);
+    std::string pair;
+    std::map<std::string, std::string> post_data;
+
+    while (std::getline(body_stream, pair, '&')) {
+        std::istringstream pair_stream(pair);
+        std::string key, value;
+
+        if (std::getline(pair_stream, key, '=')) {
+            std::getline(pair_stream, value);
+            post_data[url_decode(key)] = url_decode(value);
+        }
+    }
+
+    std::cout << "Parsed POST data:" << std::endl;
+    for (const auto& item : post_data) {
+        std::cout << item.first << ": " <<  item.second << std::endl;
+    }
+
+    std::string response_body = "Data received:\n";
+    for (const auto& item : post_data) {
+        response_body += item.first + " = " + item.second + "\n";
+    }
+
+    return "HTTP/1.1 200 OK\r\n"
+           "Content-Type: text/plain\r\n"
+           "Content-Length: " + std::to_string(response_body.length()) + "\r\n"
+           "\r\n"
+           + response_body;
+}
+
+std::string handleNotFoundRequest(const std::map<std::string, std::string>& headers) {
+    return "HTTP/1.1 404 Not Found\r\n"
+           "Content-Type: text/plain\r\n"
+           "\r\n"
+           "Not Found\r\n";
+} 
+
 int main() {
     // Creating the socket
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -201,6 +271,7 @@ int main() {
             // IT IS NOT SERVING THE HTTP REQUESTS. FOR THIS, LOOK BELOW FOR COMMENTS
 
             std::string response;
+            std::string request_body;
             if (std::getline(request_stream, line)) {
                 std::istringstream line_stream(line);
                 line_stream >> method >> uri >> http_version;
@@ -234,7 +305,6 @@ int main() {
                     std::cout << header.first << ": " << header.second << std::endl;
                 }
 
-                std::string request_body;
                 if (method == "POST") {
                     // We extract the body (as before)
                     std::size_t body_pos = full_request.find("\r\n\r\n");
@@ -304,68 +374,11 @@ int main() {
             } else if (method == "GET" && uri == "/api/time") {
                 response = handleApiTimeRequest(headers);
             } else if (method == "GET" && startsWith(uri, "/static/")) {
-                std::string file_path = uri.substr(1);
-                std::string file_content = readFile(file_path);
-                if (!file_content.empty()) {
-                    std::string mime_type = getMimeType(file_path);
-
-                    response = "HTTP/1.1 200 OK\r\n"
-                               "Content-Type: " + mime_type + "\r\n"
-                               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
-                               "\r\n"
-                               + file_content;
-                } else {
-                    response = "HTTP/1.1 404 Not Found\r\n"
-                               "Content-Type: text/plain\r\n"
-                               "\r\n"
-                               "File not found.\r\n";
-                }
+                response = handleStaticFileRequest(headers, uri);
             } else if (method == "POST" && uri == "/submit-data") {
-                std::string full_request(buffer.begin(), buffer.begin() + bytes_received);
-                std::size_t body_pos = full_request.find("\r\n\r\n");
-
-                std::string request_body;
-                if (body_pos != std::string::npos) {
-                    request_body = full_request.substr(body_pos + 4); // Extract POST body
-                    std::cout << "Raw POST request body: " << request_body << std::endl;
-
-                    std::istringstream body_stream(request_body);
-                    std::string pair;
-                    std::map<std::string, std::string> post_data;
-
-                    while (std::getline(body_stream, pair, '&')) {
-                        std::istringstream pair_stream(pair);
-                        std::string key, value;
-
-                        if (std::getline(pair_stream, key, '=')) {
-                            std::getline(pair_stream, value);
-                            post_data[url_decode(key)] = url_decode(value); // Consider URL-decoding here
-                        }
-                    }
-
-                    std::cout << "Parsed POST data:" << std::endl;
-                    for (const auto& item : post_data) {
-                        std::cout << item.first << ": " << item.second << std::endl;
-                    }
-
-                    // Build response
-                    std::string response_body = "Data received:\n";
-                    for (const auto& item : post_data) {
-                        response_body += item.first + " = " + item.second + "\n";
-                    }
-
-                    response = "HTTP/1.1 200 OK\r\n"
-                               "Content-Type: text/plain\r\n"
-                               "Content-Length: " + std::to_string(response_body.length()) + "\r\n"
-                               "\r\n"
-                               + response_body;
-                }
+                response = handleSubmitDataPostRequest(headers, request_body);
             } else {
-                // For any other request, we will send a 404 Not Found
-                response = "HTTP/1.1 404 Not Found\r\n"
-                           "Content-Type: text/plain\r\n"
-                           "\r\n"
-                           "Not Found\r\n";
+                response = handleNotFoundRequest(headers);
             }
 
             // Sending the response back to the client
