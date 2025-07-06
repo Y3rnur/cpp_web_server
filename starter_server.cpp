@@ -62,6 +62,26 @@ std::string readFile(const std::string& filename) {
     }
 }
 
+std::map<std::string, std::string> parseUrlEncodedFormData(const std::string& encoded_data) {
+    std::map<std::string, std::string> parsed_data;
+    if (encoded_data.empty()) {
+        return parsed_data;     // Empty map, if no data
+    }
+    std::istringstream body_stream(encoded_data);
+    std::string pair;
+
+    while (std::getline(body_stream, pair, '&')) {
+        std::istringstream pair_stream(pair);
+        std::string key, value;
+
+        if (std::getline(pair_stream, key, '=')) {
+            std::getline(pair_stream, value);
+            parsed_data[url_decode(key)] = url_decode(value);
+        }
+    }
+    return parsed_data;
+}
+
 std::string handleRootRequest(const std::map<std::string, std::string>& headers) {
     std::cout << "Handling root request..." << std::endl;
     // We can also access the values of headers if needed
@@ -171,20 +191,7 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
                "Bad Request: Empty POST body.\r\n";
     }
 
-    std::istringstream body_stream(request_body);
-    std::string pair;
-    std::map<std::string, std::string> post_data;
-
-    while (std::getline(body_stream, pair, '&')) {
-        std::istringstream pair_stream(pair);
-        std::string key, value;
-
-        if (std::getline(pair_stream, key, '=')) {
-            std::getline(pair_stream, value);
-            post_data[url_decode(key)] = url_decode(value);
-        }
-    }
-
+    std::map<std::string, std::string> post_data = parseUrlEncodedFormData(request_body);
     std::cout << "Parsed POST data:" << std::endl;
     for (const auto& item : post_data) {
         std::cout << item.first << ": " <<  item.second << std::endl;
@@ -311,19 +318,8 @@ int main() {
                     if (body_pos != std::string::npos) {
                         request_body = full_request.substr(body_pos + 4);
                         std::cout << "Raw POST request body: " << request_body << std::endl;
-                        std::istringstream body_stream(request_body);
-                        std::string pair;
-                        std::map<std::string, std::string> post_data;
-
-                        while (std::getline(body_stream, pair, '&')) {
-                            std::istringstream pair_stream(pair);
-                            std::string key, value;
-
-                            if (std::getline(pair_stream, key, '=')) {
-                                std::getline(pair_stream, value);
-                                post_data[url_decode(key)] = url_decode(value); // Consider URL-decoding here
-                            }
-                        }
+                        
+                        std::map<std::string, std::string> post_data = parseUrlEncodedFormData(request_body);
 
                         std::cout << "Parsed POST data:" << std::endl;
                         for (const auto& item : post_data) {
