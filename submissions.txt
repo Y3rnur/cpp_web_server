@@ -1,0 +1,21 @@
+--- Submission at 2025-07-07 19:41:33 ---
+Message: Hello, World!
+It is my journey on C++ web server building
+Goodbye!
+-------------------------------------------------
+
+--- Submission at 2025-07-07 19:44:16 ---
+Message: Hello!
+World!
+This is an another submission.
+Testing if the submission.txt is saving every submitted message.
+Go
+-------------------------------------------------
+
+--- Submission at 2025-07-07 19:51:29 ---
+Message: Hello!
+World!
+I am trying to check the proper work of the submissions.txt, the file that should store the all submitted message from users.
+Goodbye! See ya.
+-------------------------------------------------
+

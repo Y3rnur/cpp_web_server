@@ -197,6 +197,33 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
         std::cout << item.first << ": " <<  item.second << std::endl;
     }
 
+    // Getting user message from the parsed data (for now, we will save it in submissions.txt)
+    std::string user_message = "";
+    if (post_data.count("user_message")) {
+        user_message = post_data.at("user_message");
+    }
+
+    // Getting the current timestamp with chrono
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    std::tm* ptm = std::localtime(&now_c);
+
+    std::ostringstream timestamp_oss;
+    timestamp_oss << std::put_time(ptm, "%Y-%m-%d %H:%M:%S");
+    std::string timestamp_str = timestamp_oss.str();
+
+    // Open file in append mode
+    std::ofstream outfile("submissions.txt", std::ios::app);
+    if (outfile.is_open()) {
+        outfile << "--- Submission at " << timestamp_str << " ---\n";
+        outfile << "Message: " << user_message << "\n";
+        outfile << "-----------------------------------------\n\n";
+        outfile.close();
+        std::cout << "Successfully saved submission to submissions.txt" << std::endl;
+    } else {
+        std::cerr << "Error: Unable to open submissions.txt for writing!" << std::endl;
+    }
+
     std::string response_body = "Data received:\n";
     for (const auto& item : post_data) {
         response_body += item.first + " = " + item.second + "\n";
@@ -257,7 +284,7 @@ int main() {
         std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << std::endl;
 
         // Buffer to store the incoming request
-        std::vector<char> buffer(1024);     // <-- 1 KB buffer
+        std::vector<char> buffer(8192);     // <-- 1 KB buffer
         ssize_t bytes_received = recv(client_socket, buffer.data(), buffer.size(), 0);
 
         if (bytes_received > 0) {
