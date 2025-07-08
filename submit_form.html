@@ -12,5 +12,27 @@
         </div>
         <button type="submit">Submit Message</button>
     </form>
+
+    <hr> <h2>View Past Submissions</h2>
+    <button id="displaySubmissionsBtn">Display Submissions</button>
+    <pre id="submissionsDisplayArea"></pre> <script>
+        document.getElementById('displaySubmissionsBtn').addEventListener('click', async() => {
+            const displayArea = document.getElementById('submissionsDisplayArea');
+            displayArea.textContent = 'Loading submissions...';  // Showing loading message
+
+            try {
+                const response = await fetch('/view-submissions');  // Make a GET request to a web server
+                if (response.ok) {
+                    const data = await response.text();  // Get the response as plain text
+                    displayArea.textContent = data;  // Displaying the data
+                } else {
+                    displayArea.textContent = 'Error loading submissions: ' + response.statusText;
+                }
+            } catch (error) {
+                displayArea.textContent = 'Network error: ' + error.message;
+                console.error('Error fetching submissions:', error);
+            }
+        });
+    </script>
 </body>
 </html>

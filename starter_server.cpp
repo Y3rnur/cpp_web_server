@@ -241,7 +241,34 @@ std::string handleNotFoundRequest(const std::map<std::string, std::string>& head
            "Content-Type: text/plain\r\n"
            "\r\n"
            "Not Found\r\n";
-} 
+}
+
+std::string handleViewSubmissionsRequest(const std::map<std::string, std::string>& headers) {
+    std::cout << "Handling view submissions request..." << std::endl;
+
+    std::string file_content = readFile("submissions.txt");  // Reading the submissions.txt
+    if (!file_content.empty()) {
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/plain\r\n"
+               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
+               "\r\n"
+               + file_content;
+    } else {
+        // If the file is empty or doesn't exist
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/plain\r\n"
+               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
+               "\r\n"
+               "No submissions to display yet.\r\n";
+    }
+}
+
+/////////////////////////////////////////////////
+/////////  MAIN PROGRAM STARTS HERE   ///////////
+/////////////////////////////////////////////////
+
+// ||||||||||||||||||||||||||||||||||||||||||||||
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
 int main() {
     // Creating the socket
@@ -400,6 +427,8 @@ int main() {
                 response = handleStaticFileRequest(headers, uri);
             } else if (method == "POST" && uri == "/submit-data") {
                 response = handleSubmitDataPostRequest(headers, request_body);
+            } else if (method == "GET" && uri == "/view-submissions") {
+                response = handleViewSubmissionsRequest(headers);
             } else {
                 response = handleNotFoundRequest(headers);
             }
