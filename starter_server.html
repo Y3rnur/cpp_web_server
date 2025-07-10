@@ -2,12 +2,17 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>My First Served Page!</title>
+    <title>Welcome to My C++ Server!</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-    <h1>Hello from my C++ server!</h1>
-    <button onclick = "sayHi()"> Click me</button>
+<body class="home-page"> <div class="containter"> <h1>Hello from my C++ server!</h1>
+    <div style="text-align: center; margin-top: 20px; margin-bottom: 30px"><button onclick = "sayHi()"> Click me</button></div>
+    <nav> <a href="/submit_form">Submit Data</a>
+          <a href="/about">About Us</a>
+          <a href="/api/time">API Time</a>
+    </nav>
+    <p>Explore the features by navigating through the links above.</p>
+    </div>
     <script src="/static/script.js"></script>
 </body>
 </html>

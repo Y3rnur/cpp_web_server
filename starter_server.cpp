@@ -144,10 +144,10 @@ std::string handleApiTimeRequest(const std::map<std::string, std::string>& heade
 
     auto now = std::chrono::system_clock::now();
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    std::tm* ptm = std::gmtime(&now_c);
+    std::tm* ptm = std::localtime(&now_c);
 
     std::ostringstream oss;
-    oss << std::put_time(ptm, "%Y-%m-%dT%H:%M:%SZ");
+    oss << std::put_time(ptm, "%Y-%m-%d %H:%M:%S");
     std::string current_time_str = oss.str();
 
     std::string json = "{\"server_time\": \"" + current_time_str + "\"}";

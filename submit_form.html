@@ -1,38 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>My POST Form</title>
+    <title>Submit Form</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Enter some data:</h1>
-    <form action="/submit-data" method="post">
-        <div>
-            <label for="message">Message:</label>
-            <textarea id="message" name="user_message" rows="4" cols="50"></textarea>
-        </div>
-        <button type="submit">Submit Message</button>
-    </form>
+    <div class="container">
+        <h1>Enter some data:</h1>
+        <form action="/submit-data" method="post">
+            <div>
+                <label for="message">Message:</label>
+                <textarea id="message" name="user_message" rows="4" cols="50"></textarea>
+            </div>
+            <button type="submit">Submit Message</button>
+        </form>
 
-    <hr> <h2>View Past Submissions</h2>
-    <button id="displaySubmissionsBtn">Display Submissions</button>
-    <pre id="submissionsDisplayArea"></pre> <script>
-        document.getElementById('displaySubmissionsBtn').addEventListener('click', async() => {
-            const displayArea = document.getElementById('submissionsDisplayArea');
-            displayArea.textContent = 'Loading submissions...';  // Showing loading message
+        <hr> <h2>View Past Submissions</h2>
+        <button id="displaySubmissionsBtn">Display Submissions</button>
+        <pre id="submissionsDisplayArea"></pre> <script>
+            document.getElementById('displaySubmissionsBtn').addEventListener('click', async() => {
+                const displayArea = document.getElementById('submissionsDisplayArea');
+                displayArea.textContent = 'Loading submissions...';  // Showing loading message
 
-            try {
-                const response = await fetch('/view-submissions');  // Make a GET request to a web server
-                if (response.ok) {
-                    const data = await response.text();  // Get the response as plain text
-                    displayArea.textContent = data;  // Displaying the data
-                } else {
-                    displayArea.textContent = 'Error loading submissions: ' + response.statusText;
+                try {
+                    const response = await fetch('/view-submissions');  // Make a GET request to a web server
+                    if (response.ok) {
+                        const data = await response.text();  // Get the response as plain text
+                        displayArea.textContent = data;  // Displaying the data
+                    } else {
+                        displayArea.textContent = 'Error loading submissions: ' + response.statusText;
+                    }
+                } catch (error) {
+                    displayArea.textContent = 'Network error: ' + error.message;
+                    console.error('Error fetching submissions:', error);
                 }
-            } catch (error) {
-                displayArea.textContent = 'Network error: ' + error.message;
-                console.error('Error fetching submissions:', error);
-            }
-        });
-    </script>
+            });
+        </script>
+    </div>
 </body>
 </html>
