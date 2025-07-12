@@ -9,15 +9,18 @@
         <h1>Enter some data:</h1>
         <form action="/submit-data" method="post">
             <div>
-                <label for="message">Message:</label>
-                <textarea id="message" name="user_message" rows="4" cols="50"></textarea>
+                <label for="user_message">Message:</label><br>
+                <textarea id="user_message" name="user_message" rows="10" cols="50"></textarea>
+                <p id="char-count" style="font-size: 0.9em; color: #666; margin-top: 5px;">Characters: 0</p>
             </div>
             <button type="submit">Submit Message</button>
         </form>
 
         <hr> <h2>View Past Submissions</h2>
         <button id="displaySubmissionsBtn">Display Submissions</button>
-        <pre id="submissionsDisplayArea"></pre> <script>
+        <pre id="submissionsDisplayArea"></pre>
+            <script src="/static/script.js"></script>
+            <script>
             document.getElementById('displaySubmissionsBtn').addEventListener('click', async() => {
                 const displayArea = document.getElementById('submissionsDisplayArea');
                 displayArea.textContent = 'Loading submissions...';  // Showing loading message

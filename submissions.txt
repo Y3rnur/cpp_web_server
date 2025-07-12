@@ -19,3 +19,33 @@ I am trying to check the proper work of the submissions.txt, the file that shoul
 Goodbye! See ya.
 -------------------------------------------------
 
+--- Submission at 2025-07-12 23:16:12 ---
+Message: Hello, how are ya?
+-----------------------------------------
+
+--- Submission at 2025-07-12 23:16:19 ---
+Message: Hello, how are ya?
+-----------------------------------------
+
+--- Submission at 2025-07-12 23:30:43 ---
+Message: 
+-----------------------------------------
+
+--- Submission at 2025-07-12 23:37:12 ---
+Message: Checking submitted messages
+How is it going?
+-----------------------------------------
+
+--- Submission at 2025-07-12 23:46:40 ---
+Message: Checking the character counter
+1
+2
+3
+-----------------------------------------
+
+--- Submission at 2025-07-12 23:51:37 ---
+Message: Character Counter is now working!
+Hooray!
+Goodbye!
+-----------------------------------------
+
