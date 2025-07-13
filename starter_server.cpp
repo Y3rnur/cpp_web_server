@@ -185,10 +185,28 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
 
     if (request_body.empty()) {
         std::cerr << "POST request received with empty body." << std::endl;
+        std::string error_html_body = R"(
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Bad Request</title>
+            <link rel="stylesheet" href="/static/style.css>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Bad Request</h1>
+                <p>The message submission failed: The request body was empty.</p>
+                <p><a href="/submit_form">Go back to the submission form</a></p>
+            </div>
+        </body>
+        </html>
+        )";
+
         return "HTTP/1.1 400 Bad Request\r\n"
-               "Content-Type: text/plain\r\n"
+               "Content-Type: text/html\r\n"
+               "Content-Length: " + std::to_string(error_html_body.length()) + "\r\n"
                "\r\n"
-               "Bad Request: Empty POST body.\r\n";
+               + error_html_body;
     }
 
     std::map<std::string, std::string> post_data = parseUrlEncodedFormData(request_body);
@@ -202,6 +220,40 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
     if (post_data.count("user_message")) {
         user_message = post_data.at("user_message");
     }
+
+    // FIRST OF ALL, we check if the user_message field itself is not empty
+    if (user_message.empty()) {
+        std::cerr << "User submitted an empty message." << std::endl;
+        std::string error_html_body = R"(
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Bad Request</title>
+            <link rel="stylesheet" href="/static/style.css">
+        </head>
+        <body>
+            <div class="container">
+                <h1>Bad Request</h1>
+                <p>The message submission failed: You submitted an empty message. Please enter some text.</p>
+                <p><a href="/submit_form">Go back to the submission form</a></p>
+            </div>
+        </body>
+        </html>
+        )";
+
+        return "HTTP/1.1 400 Bad Request\r\n"
+               "Content-Type: text/html\r\n"
+               "Content-Length: " + std::to_string(error_html_body.length()) + "\r\n"
+               "\r\n"
+               + error_html_body;
+    }
+    
+    // Simple HTML entity encoding
+    size_t pos = user_message.find("&"); while(pos != std::string::npos){user_message.replace(pos, 1, "&amp;"); pos = user_message.find("&", pos + 5); }
+    pos = user_message.find("<"); while(pos != std::string::npos) {user_message.replace(pos, 1, "&lt;"); pos = user_message.find("<", pos + 4); }
+    pos = user_message.find(">"); while(pos != std::string::npos) {user_message.replace(pos, 1, "&gt;"); pos = user_message.find(">", pos + 4); }
+    pos = user_message.find("\""); while (pos != std::string::npos) {user_message.replace(pos, 1, "&quot;"); pos = user_message.find("\"", pos + 6); }
+    pos = user_message.find("'"); while (pos != std::string::npos) {user_message.replace(pos, 1, "&#39;"); pos = user_message.find("'", pos + 5); }
 
     // Getting the current timestamp with chrono
     auto now = std::chrono::system_clock::now();
@@ -224,13 +276,42 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
         std::cerr << "Error: Unable to open submissions.txt for writing!" << std::endl;
     }
 
-    std::string response_body = "Data received:\n";
-    for (const auto& item : post_data) {
-        response_body += item.first + " = " + item.second + "\n";
-    }
+    //std::string response_body = "Data received:\n";
+    //for (const auto& item : post_data) {
+        //response_body += item.first + " = " + item.second + "\n";
+    //}
+
+    std::ostringstream html_response_oss;
+    html_response_oss << R"(
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Submission Confirmation</title>
+        <link rel="stylesheet" href="/static/style.css">
+    </head>
+    <body>
+        <div class="container">
+            <h1>Thank You for Your Submission!</h1>
+            <p>Your message has been successfully received:</p>
+            <p style="font-style: italic; color: #4CAF50; font-size: 1.1em; word-wrap: break-word; border: 1px dashed #ddd; padding: 10px; background-color: #f9f9f9;">"
+    )" << user_message << R"( "</p>
+            <p style="font-size: 0.9em; color: #777;">Submitted at: )" << timestamp_str << R"(</p>)" <<
+            R"(
+            <hr>
+            <p>
+                <a href="/submit_form">Submit another message</a> |
+                <a href="/">Go to Home Page</a> |
+                <a href="/view-submissions">View all submissions</a>
+            </p>
+        </div>
+    </body>
+    </html>
+    )";
+
+    std::string response_body = html_response_oss.str();
 
     return "HTTP/1.1 200 OK\r\n"
-           "Content-Type: text/plain\r\n"
+           "Content-Type: text/html\r\n"
            "Content-Length: " + std::to_string(response_body.length()) + "\r\n"
            "\r\n"
            + response_body;
