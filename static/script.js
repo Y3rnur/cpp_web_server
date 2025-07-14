@@ -24,6 +24,25 @@ function updateCharactersCount() {
     }
 }
 
+const quotes = [
+    {quote: "The only way to do great work is to love what you do.", author: "Steve Jobs"},
+    {quote: "Believe you can and you're halfway there.", author: "Theodore Roosevelt"},
+    {quote: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt"},
+    {quote: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein"},
+    {quote: "The best way to predict the future is to create it.", author: "Peter Drucker"},
+    {quote: "It always seems impossible until it's done.", author: "Nelson Mandela"}
+];
+
+function displayRandomQuote() {
+    const quoteDisplayElement = document.getElementById('quote-display');
+    if (quoteDisplayElement) {
+        const randomIndex = Math.floor(Math.random() * quotes.length);  // Getting random index
+        const randomQuote = quotes[randomIndex];    // Getting random quote object
+
+        quoteDisplayElement.innerHTML = `"${randomQuote.quote}" - <strong>${randomQuote.author}</strong>`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 
     const clockElement = document.getElementById('client-clock');
@@ -36,5 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (messageTextarea) {
         messageTextarea.addEventListener('input', updateCharactersCount);
         updateCharactersCount();     // After every typed character by user, we update char. count
+    }
+
+    const newQuoteButton = document.getElementById('newQuoteBtn');
+    if (newQuoteButton) {
+        newQuoteButton.addEventListener('click', displayRandomQuote);
+        displayRandomQuote();   // Calling once the button is clicked
     }
 });
