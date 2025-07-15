@@ -327,21 +327,32 @@ std::string handleNotFoundRequest(const std::map<std::string, std::string>& head
 std::string handleViewSubmissionsRequest(const std::map<std::string, std::string>& headers) {
     std::cout << "Handling view submissions request..." << std::endl;
 
-    std::string file_content = readFile("submissions.txt");  // Reading the submissions.txt
-    if (!file_content.empty()) {
-        return "HTTP/1.1 200 OK\r\n"
-               "Content-Type: text/plain\r\n"
-               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
-               "\r\n"
-               + file_content;
-    } else {
-        // If the file is empty or doesn't exist
-        return "HTTP/1.1 200 OK\r\n"
-               "Content-Type: text/plain\r\n"
-               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
-               "\r\n"
-               "No submissions to display yet.\r\n";
+    std::string submissions_content;
+    std::ifstream infile("submissions.txt");    // Opening the submissions file
+    if (infile.is_open()) {
+        std::string line;
+        while (std::getline(infile, line)) {
+            submissions_content += line + "\n";     // Appending each line to string (+ newline)
+        }
+        infile.close();
+
+        if (submissions_content.empty()) {
+            submissions_content = "No submissions to display yet. Submit a message from the form page!";
+        }
+        std::cout << "Successfully read submissions from submissions.txt" << std::endl;
+    } else {        
+        // In case the file cannot be opened
+        submissions_content = "Error:Unable to open submissions.txt! Please ensure the file exists and is accessible.";
+        std::cerr << "Error: Unable to open submissions.txt for reading!" << std::endl;
     }
+
+    std::string response_body = submissions_content;
+
+    return "HTTP/1.1 200 OK\r\n"
+           "Content-Type: text/plain; charset=UTF-8\r\n"
+           "Content-Length: " + std::to_string(response_body.length()) + "\r\n"
+           "\r\n"
+           + response_body;
 }
 
 /////////////////////////////////////////////////
