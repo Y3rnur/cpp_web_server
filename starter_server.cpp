@@ -317,11 +317,37 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
            + response_body;
 }
 
+const std::string NOT_FOUND_HTML = R"(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>404 Not Found</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f4; color: #333; }
+        .container {background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); padding: 30px; display: inline-block; }
+        h1 { color: #d9534f; }
+        p { font-size: 1.1em; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>404 Not Found</h1>
+        <p>Oops! The page you are looking for could not be found.</p>
+        <p>Please check the URL or return to the <a href="/">homepage</a>.</p>
+    </div>
+</body>
+</html>
+)";
+
 std::string handleNotFoundRequest(const std::map<std::string, std::string>& headers) {
     return "HTTP/1.1 404 Not Found\r\n"
-           "Content-Type: text/plain\r\n"
+           "Content-Type: text/html; charset=UTF-8\r\n"
+           "Content-Length: " + std::to_string(NOT_FOUND_HTML.length()) + "\r\n"
+           "Connection: close\r\n"
            "\r\n"
-           "Not Found\r\n";
+           + NOT_FOUND_HTML;
 }
 
 std::string handleViewSubmissionsRequest(const std::map<std::string, std::string>& headers) {
