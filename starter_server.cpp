@@ -353,30 +353,162 @@ std::string handleNotFoundRequest(const std::map<std::string, std::string>& head
 std::string handleViewSubmissionsRequest(const std::map<std::string, std::string>& headers) {
     std::cout << "Handling view submissions request..." << std::endl;
 
-    std::string submissions_content;
+    std::string submissions_raw_content; // Renamed to avoid confusion with processed HTML content
     std::ifstream infile("submissions.txt");    // Opening the submissions file
     if (infile.is_open()) {
         std::string line;
         while (std::getline(infile, line)) {
-            submissions_content += line + "\n";     // Appending each line to string (+ newline)
+            submissions_raw_content += line + "\n";     // Appending each line to string (+ newline)
         }
         infile.close();
 
-        if (submissions_content.empty()) {
-            submissions_content = "No submissions to display yet. Submit a message from the form page!";
+        if (submissions_raw_content.empty()) {
+            // Note: This string won't be used directly now, as we generate HTML for this case
+            // submissions_raw_content = "No submissions to display yet. Submit a message from the form page!";
         }
         std::cout << "Successfully read submissions from submissions.txt" << std::endl;
     } else {        
         // In case the file cannot be opened
-        submissions_content = "Error:Unable to open submissions.txt! Please ensure the file exists and is accessible.";
+        submissions_raw_content = "Error:Unable to open submissions.txt! Please ensure the file exists and is accessible.";
         std::cerr << "Error: Unable to open submissions.txt for reading!" << std::endl;
     }
 
-    std::string response_body = submissions_content;
+    std::ostringstream html_response_oss;
+    html_response_oss << R"(
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>View Submissions</title>
+        <link rel="stylesheet" href="/static/style.css">
+        <style>
+            /* Your CSS styles here */
+            .container {
+                max-width: 800px;
+                margin: 50px auto;
+                padding: 20px;
+                background-color: #fff;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            h1 {
+                text-align: center;
+                color: #333;
+                margin-bottom: 30px;
+            }
+            .submission-entry {
+                border: 1px solid #eee;
+                padding: 15px;
+                margin-bottom: 10px;
+                background-color: #fcfcfc;
+                border-radius: 5px;
+                word-wrap: break-word; /* Ensure long words wrap */
+            }
+            .submission-date {
+                font-size: 0.9em;
+                color: #888;
+                margin-bottom: 5px;
+            }
+            .submission-message {
+                white-space: pre-wrap; /* Preserves whitespace and line breaks */
+                font-family: monospace;
+                background-color: #f0f0f0;
+                padding: 10px;
+                border-radius: 3px;
+                word-wrap: break-word; /* Ensure long words wrap */
+            }
+            hr {
+                border: 0;
+                height: 1px;
+                background: #ddd;
+                margin: 20px 0;
+            }
+            p.links {
+                text-align: center;
+            }
+            p.links a {
+                margin: 0 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>All Submissions</h1>
+    )";
+
+    std::istringstream raw_stream(submissions_raw_content);
+    std::string line;
+    std::string current_submission_date;
+    std::string current_submission_message;
+    bool in_message_content = false; // New flag to track if we're inside a message's content
+
+    while (std::getline(raw_stream, line)) {
+        // Trim potential trailing carriage return from getline, common with Windows files
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+
+        if (startsWith(line, "--- Submission at ")) {
+            // If we were parsing a message, finalize the previous entry
+            if (in_message_content || !current_submission_message.empty()) {
+                html_response_oss << "<div class=\"submission-entry\">"
+                                  << "<div class=\"submission-date\">" << current_submission_date << "</div>"
+                                  << "<div class=\"submission-message\">" << current_submission_message << "</div>"
+                                  << "</div>";
+                current_submission_message.clear(); // Clear for the next message
+            }
+            in_message_content = false; // Reset flag
+
+            current_submission_date = line.substr(line.find(" at ") + 4); // Extract full date string
+        } else if (startsWith(line, "Message: ")) {
+            current_submission_message = line.substr(9) + "\n"; // Start collecting message content
+            in_message_content = true; // Set flag: now collecting message lines
+        } else if (startsWith(line, "-----------------------------------------")) {
+            // End of an entry: if we were collecting a message, finalize it
+            if (in_message_content || !current_submission_message.empty()) {
+                html_response_oss << "<div class=\"submission-entry\">"
+                                  << "<div class=\"submission-date\">" << current_submission_date << "</div>"
+                                  << "<div class=\"submission-message\">" << current_submission_message << "</div>"
+                                  << "</div>";
+                current_submission_message.clear(); // Clear for the next message
+            }
+            in_message_content = false; // Message content block ended
+        } else if (in_message_content) {
+            // If we are currently inside a message content block, append this line
+            current_submission_message += line + "\n";
+        }
+    }
+
+    // After the loop, check if there's any pending message (e.g., file ends without '---')
+    if (in_message_content || !current_submission_message.empty()) {
+        html_response_oss << "<div class=\"submission-entry\">"
+                          << "<div class=\"submission-date\">" << current_submission_date << "</div>"
+                          << "<div class=\"submission-message\">" << current_submission_message << "</div>"
+                          << "</div>";
+    }
+
+    // Handle empty submissions file/content case
+    // This checks if any 'submission-entry' div was added
+    if (submissions_raw_content.empty() || html_response_oss.str().find("<div class=\"submission-entry\">") == std::string::npos) {
+        html_response_oss << "<p>No submissions to display yet. Submit a message from the form page!</p>";
+    }
+
+    html_response_oss << R"(
+            <hr>
+            <p class="links">
+                <a href="/submit_form">Submit a new message</a> |
+                <a href="/">Go to Home Page</a>
+            </p>
+        </div>
+    </body>
+    </html>
+    )";
+    
+    std::string response_body = html_response_oss.str();
 
     return "HTTP/1.1 200 OK\r\n"
-           "Content-Type: text/plain; charset=UTF-8\r\n"
+           "Content-Type: text/html; charset=UTF-8\r\n"
            "Content-Length: " + std::to_string(response_body.length()) + "\r\n"
+           "Connection: close\r\n"
            "\r\n"
            + response_body;
 }
