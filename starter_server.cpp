@@ -14,6 +14,7 @@
 #include <ctime>
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 
 std::string getMimeType(const std::string& path) {
     if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html";
@@ -182,8 +183,8 @@ std::string handleStaticFileRequest(const std::map<std::string, std::string>& he
     }
 }
 
-// Using mutex for safe data input by users
-std::mutex submissions_mutex;
+// Using shared mutex for safe data input by users (previous version had just mutex)
+std::shared_mutex submissions_mutex;
 
 std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>& headers, const std::string& request_body) {
     std::cout << "Handling POST data submission..." << std::endl;
@@ -270,8 +271,8 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
     std::string timestamp_str = timestamp_oss.str();
 
     {
-        std::lock_guard<std::mutex> lock(submissions_mutex);    // Using lock_guard and giving it the ownership of mutex
-                                                                // so it will automatically lock/unlock the thread
+        std::unique_lock<std::shared_mutex> lock(submissions_mutex);    // Using unique_lock and giving it the ownership of mutex
+                                                                        // so it will automatically lock/unlock the thread (for writing into file)
         // Open file in append mode
         std::ofstream outfile("submissions.txt", std::ios::app);
         if (outfile.is_open()) {
@@ -367,6 +368,9 @@ std::string handleViewSubmissionsRequest(const std::map<std::string, std::string
     std::cout << "Handling view submissions request..." << std::endl;
 
     std::string submissions_raw_content; // Renamed to avoid confusion with processed HTML content
+
+    std::shared_lock<std::shared_mutex> lock(submissions_mutex);    // Using shared_lock for allowing multiple threads to read at once.
+
     std::ifstream infile("submissions.txt");    // Opening the submissions file
     if (infile.is_open()) {
         std::string line;
