@@ -12,6 +12,8 @@
 #include <string>
 #include <chrono>
 #include <ctime>
+#include <thread>
+#include <mutex>
 
 std::string getMimeType(const std::string& path) {
     if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html";
@@ -180,6 +182,9 @@ std::string handleStaticFileRequest(const std::map<std::string, std::string>& he
     }
 }
 
+// Using mutex for safe data input by users
+std::mutex submissions_mutex;
+
 std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>& headers, const std::string& request_body) {
     std::cout << "Handling POST data submission..." << std::endl;
 
@@ -264,17 +269,24 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
     timestamp_oss << std::put_time(ptm, "%Y-%m-%d %H:%M:%S");
     std::string timestamp_str = timestamp_oss.str();
 
-    // Open file in append mode
-    std::ofstream outfile("submissions.txt", std::ios::app);
-    if (outfile.is_open()) {
-        outfile << "--- Submission at " << timestamp_str << " ---\n";
-        outfile << "Message: " << user_message << "\n";
-        outfile << "-----------------------------------------\n\n";
-        outfile.close();
-        std::cout << "Successfully saved submission to submissions.txt" << std::endl;
-    } else {
-        std::cerr << "Error: Unable to open submissions.txt for writing!" << std::endl;
+    {
+        std::lock_guard<std::mutex> lock(submissions_mutex);    // Using lock_guard and giving it the ownership of mutex
+                                                                // so it will automatically lock/unlock the thread
+        // Open file in append mode
+        std::ofstream outfile("submissions.txt", std::ios::app);
+        if (outfile.is_open()) {
+            outfile << "--- Submission at " << timestamp_str << " ---\n";
+            outfile << "Message: " << user_message << "\n";
+            outfile << "-----------------------------------------\n\n";
+            outfile.close();
+            std::cout << "Successfully saved submission to submissions.txt" << std::endl;
+        } else {
+            std::cerr << "Error: Unable to open submissions.txt for writing!" << std::endl;
+        }
+        // Lock_guard automatically unlocks mutex here, because it will go out of scope
+        // This particular part is using mutex, because threads might access the "submissions.txt" file at the same time and lead to bad consequences
     }
+    
 
     //std::string response_body = "Data received:\n";
     //for (const auto& item : post_data) {
@@ -317,6 +329,7 @@ std::string handleSubmitDataPostRequest(const std::map<std::string, std::string>
            + response_body;
 }
 
+// 404 Not Found page custom interface below
 const std::string NOT_FOUND_HTML = R"(
 <!DOCTYPE html>
 <html>
@@ -513,53 +526,8 @@ std::string handleViewSubmissionsRequest(const std::map<std::string, std::string
            + response_body;
 }
 
-/////////////////////////////////////////////////
-/////////  MAIN PROGRAM STARTS HERE   ///////////
-/////////////////////////////////////////////////
-
-// ||||||||||||||||||||||||||||||||||||||||||||||
-// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-int main() {
-    // Creating the socket
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd == -1) {      //Checking if the created socket is created
-        std::cerr << "Error creating socket" << std::endl;
-        return -1;
-    }
-
-    // Specifying the server address
-    sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = INADDR_ANY;    //listen on all available interfaces
-    server_address.sin_port = htons(8080);          // Port number that we will use
-
-    // Binding the socket to the specified address and port
-    if (bind(server_fd, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
-        std::cerr << "Error binding the socket" << std::endl;
-        close(server_fd);
-        return -1;
-    }
-
-    // Trying to listen (like connecting to the web server)
-    if (listen(server_fd, SOMAXCONN) == -1) {
-        std::cerr << "Error listening on socket" << std::endl;
-        close(server_fd);
-        return -1;
-    } 
-
-    std::cout << "Server listening on port 8080..." << std::endl;
-    
-    while (true) {
-        sockaddr_in client_address;
-        socklen_t client_len = sizeof(client_address);
-        int client_socket = accept(server_fd, (struct sockaddr*)&client_address, &client_len);
-        if (client_socket == -1) {
-            std::cerr << "Error accepting connection" << std::endl;
-            continue;   // Proceeds to listen to another connections
-        }
-        std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << std::endl;
-
+void handleClient(int client_socket, const sockaddr_in& client_address) {
+    std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << std::endl;
         // Buffer to store the incoming request
         std::vector<char> buffer(8192);     // <-- 1 KB buffer
         ssize_t bytes_received = recv(client_socket, buffer.data(), buffer.size(), 0);
@@ -697,6 +665,56 @@ int main() {
         }
         // Closing the connection immediately (of client)
         close(client_socket);
+}
+
+/////////////////////////////////////////////////
+/////////  MAIN PROGRAM STARTS HERE   ///////////
+/////////////////////////////////////////////////
+
+// ||||||||||||||||||||||||||||||||||||||||||||||
+// ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+int main() {
+    // Creating the socket
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {      //Checking if the created socket is created
+        std::cerr << "Error creating socket" << std::endl;
+        return -1;
+    }
+
+    // Specifying the server address
+    sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;    //listen on all available interfaces
+    server_address.sin_port = htons(8080);          // Port number that we will use
+
+    // Binding the socket to the specified address and port
+    if (bind(server_fd, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
+        std::cerr << "Error binding the socket" << std::endl;
+        close(server_fd);
+        return -1;
+    }
+
+    // Trying to listen (like connecting to the web server)
+    if (listen(server_fd, SOMAXCONN) == -1) {
+        std::cerr << "Error listening on socket" << std::endl;
+        close(server_fd);
+        return -1;
+    } 
+
+    std::cout << "Server listening on port 8080..." << std::endl;
+    
+    while (true) {
+        sockaddr_in client_address;
+        socklen_t client_len = sizeof(client_address);
+        int client_socket = accept(server_fd, (struct sockaddr*)&client_address, &client_len);
+        if (client_socket == -1) {
+            std::cerr << "Error accepting connection" << std::endl;
+            continue;   // Proceeds to listen to another connections
+        }
+        
+        std::thread client_thread(handleClient, client_socket, std::ref(client_address));
+        client_thread.detach();
     }
     
     // Closing the server socket
