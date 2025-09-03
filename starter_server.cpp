@@ -10,11 +10,16 @@
 #include <iomanip>
 #include <filesystem>
 #include <string>
+#include <algorithm>
 #include <chrono>
 #include <ctime>
 #include <thread>
 #include <mutex>
 #include <shared_mutex>
+#include "sqlite3/sqlite3.h"
+
+sqlite3 *db;
+std::shared_mutex mtx;
 
 std::string getMimeType(const std::string& path) {
     if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html";
@@ -530,6 +535,50 @@ std::string handleViewSubmissionsRequest(const std::map<std::string, std::string
            + response_body;
 }
 
+std::string handleCreateNoteRequest(const std::map<std::string, std::string>& headers) {
+    std::cout << "Handling Create Note request..." << std::endl;
+
+    std::string file_content = readFile("Notes.html");
+    if (!file_content.empty()) {
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/html\r\n"
+               "Content-Length: " + std::to_string(file_content.length()) + "\r\n"
+               "\r\n"
+               + file_content;
+
+    } else {
+        return "HTTP/1.1 500 Internal Server Error\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Error reading file\r\n";
+    }
+}
+
+void writeNoteToDB(const std::string& note_content) {
+    std::unique_lock<std::shared_mutex> lock(mtx);
+
+    const char *sql_insert = "INSERT INTO NOTES (CONTENT, TIMESTAMP) VALUES (?, datetime('now', 'localtime'));";
+    sqlite3_stmt *stmt;
+
+    if (sqlite3_prepare_v2(db, sql_insert, -1, &stmt, 0) == SQLITE_OK) {
+        // We bind the string to the '?' placeholder
+        sqlite3_bind_text(stmt, 1, note_content.c_str(), -1, SQLITE_TRANSIENT);
+
+        // We execute the statement
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Error inserting data: " << sqlite3_errmsg(db) << std::endl;
+        } else {
+            std::cout << "Note inserted successfully." << std::endl;
+        }
+    } else {
+        std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+// HANDLING THE CLIENT REQUESTS, ANOTHER FILE HANDLERS SHOULD BE ABOVE THIS COMMENT!
+
 void handleClient(int client_socket, const sockaddr_in& client_address) {
     std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << std::endl;
         // Buffer to store the incoming request
@@ -651,6 +700,29 @@ void handleClient(int client_socket, const sockaddr_in& client_address) {
                 response = handleSubmitDataPostRequest(headers, request_body);
             } else if (method == "GET" && uri == "/view-submissions") {
                 response = handleViewSubmissionsRequest(headers);
+            } else if (method == "GET" && uri == "/Notes") {
+                response = handleCreateNoteRequest(headers);
+            } else if (method == "POST" && uri == "/submit-note") {
+                std::string note_content;
+                size_t content_pos = request_body.find("note_content=");
+                if (content_pos != std::string::npos) {
+                    note_content = request_body.substr(content_pos + 13);
+                    // Decoding the note_content with our decoding function
+                    note_content = url_decode(note_content);
+                }
+
+                if (!note_content.empty()) {
+                    writeNoteToDB(note_content);
+                    response = "HTTP/1.1 200 OK\r\n"
+                               "Content-Type: text/plain\r\n"
+                               "\r\n"
+                               "Note saved successfully!";
+                } else {
+                    response = "HTTP/1.1 400 Bad Request\r\n"
+                               "Content-Type: text/plain\r\n"
+                               "\r\n"
+                               "No note content provided.";
+                }
             } else {
                 response = handleNotFoundRequest(headers);
             }
@@ -699,6 +771,39 @@ int main() {
         return -1;
     }
 
+    // Adding SQLite3 database for the web server, so we can interact with DB
+    // SQLite3 part starts here
+    // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+    
+    char *zErrMsg = 0;
+    int rc;
+
+    rc = sqlite3_open("notes.db", &db);
+
+    if (rc) {
+        std::cerr << "Can't open database: " << sqlite3_errmsg(db) << std::endl;
+        return 1;
+    } else {
+        std::cout << "Opened database successfully" << std::endl;
+    }
+
+    const char *sql = "CREATE TABLE IF NOT EXISTS NOTES(" \
+                      "ID INTEGER PRIMARY KEY AUTOINCREMENT," \
+                      "CONTENT TEXT NOT NULL," \
+                      "TIMESTAMP TEXT NOT NULL);";
+    
+    rc = sqlite3_exec(db, sql, 0, 0, &zErrMsg);
+
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL error: " << zErrMsg << std::endl;
+        sqlite3_free(zErrMsg);
+    } else {
+        std::cout << "Table created successfully" << std::endl;
+    }
+
+    // ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+    // SQLite3 part ends here
+
     // Trying to listen (like connecting to the web server)
     if (listen(server_fd, SOMAXCONN) == -1) {
         std::cerr << "Error listening on socket" << std::endl;
@@ -721,6 +826,9 @@ int main() {
         client_thread.detach();
     }
     
+    // Closing database connection
+    sqlite3_close(db);
+
     // Closing the server socket
     close(server_fd);
     return 0;
