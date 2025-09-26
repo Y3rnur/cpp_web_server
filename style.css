@@ -25,13 +25,9 @@ body {
     min-height: 100vh;
     padding: 40px 20px;
     background-attachment: fixed;
-}
-.home-btn {
-    display: inline-block;
-    background: #ff6f61;
-    color: #fff;
+    padding: 20px 14vw 20px 10vw; /* more right padding for floating button */
     font-weight: bold;
-    padding: 12px 15px;
+    padding: 12px 28px;
     border-radius: 8px;
     text-decoration: none;
     font-size: 1.2em;

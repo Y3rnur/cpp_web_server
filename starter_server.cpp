@@ -577,6 +577,53 @@ void writeNoteToDB(const std::string& note_content) {
     sqlite3_finalize(stmt);
 }
 
+std::string getAllNotesFromDB() {
+    std::shared_lock<std::shared_mutex> lock(mtx);
+    std::string notes_html;
+    const char *sql_select = "SELECT CONTENT, TIMESTAMP FROM NOTES ORDER BY ID DESC;";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(db, sql_select, -1, &stmt, 0) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const unsigned char *content = sqlite3_column_text(stmt, 0);
+            const unsigned char *timestamp = sqlite3_column_text(stmt, 1);
+            notes_html += "<div class=\"note\">";
+            notes_html += "<p>" + std::string(reinterpret_cast<const char*>(content)) + "</p>";
+            notes_html += "<span class=\"timestamp\">" + std::string(reinterpret_cast<const char*>(timestamp)) + "</span>";
+            notes_html += "</div>";
+        }
+    }
+    sqlite3_finalize(stmt);
+    return notes_html;
+}
+
+std::string handleDisplayStickyNotesRequest(const std::map<std::string, std::string>& headers) {
+    std::cout << "Handling Display Sticky Notes request..." << std::endl;
+
+    std::string display_content = readFile("display_sticky_notes.html");
+    if (!display_content.empty()) {
+        std::string notes_html = getAllNotesFromDB();
+        // Replace the notes container content with dynamic notes
+            size_t pos = display_content.find("<div class=\"notes-container\">");
+        if (pos != std::string::npos) {
+            size_t end_pos = display_content.find("</div>", pos);
+            if (end_pos != std::string::npos) {
+                // Inserting the notes_html iside the notes-container div
+                    display_content.replace(pos, end_pos - pos + 6, "<div class=\"notes-container\">" + notes_html + "</div>");
+            }
+        }
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/html\r\n"
+               "Content-Length: " + std::to_string(display_content.length()) + "\r\n"
+               "\r\n"
+               + display_content + "\r\n";
+    } else {
+        return "HTTP/1.1 500 Internal Server Error\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Error reading from file\r\n";
+    }
+}
+
 // HANDLING THE CLIENT REQUESTS, ANOTHER FILE HANDLERS SHOULD BE ABOVE THIS COMMENT!
 
 void handleClient(int client_socket, const sockaddr_in& client_address) {
@@ -723,6 +770,8 @@ void handleClient(int client_socket, const sockaddr_in& client_address) {
                                "\r\n"
                                "No note content provided.";
                 }
+            } else if (method == "GET" && uri == "/display_sticky_notes") {
+                response = handleDisplayStickyNotesRequest(headers);
             } else {
                 response = handleNotFoundRequest(headers);
             }
