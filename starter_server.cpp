@@ -580,15 +580,17 @@ void writeNoteToDB(const std::string& note_content) {
 std::string getAllNotesFromDB() {
     std::shared_lock<std::shared_mutex> lock(mtx);
     std::string notes_html;
-    const char *sql_select = "SELECT CONTENT, TIMESTAMP FROM NOTES ORDER BY ID DESC;";
+    const char *sql_select = "SELECT ID, CONTENT, TIMESTAMP FROM NOTES ORDER BY ID DESC;";
     sqlite3_stmt *stmt;
     if (sqlite3_prepare_v2(db, sql_select, -1, &stmt, 0) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
-            const unsigned char *content = sqlite3_column_text(stmt, 0);
-            const unsigned char *timestamp = sqlite3_column_text(stmt, 1);
-            notes_html += "<div class=\"note\">";
+            int id = sqlite3_column_int(stmt, 0);
+            const unsigned char *content = sqlite3_column_text(stmt, 1);
+            const unsigned char *timestamp = sqlite3_column_text(stmt, 2);
+            notes_html += "<div class=\"note\" data-note-id=\"" + std::to_string(id) + "\">";
             notes_html += "<p>" + std::string(reinterpret_cast<const char*>(content)) + "</p>";
             notes_html += "<span class=\"timestamp\">" + std::string(reinterpret_cast<const char*>(timestamp)) + "</span>";
+            notes_html += "<button class=\"delete-button\">🗑️ Delete</button>";
             notes_html += "</div>";
         }
     }
@@ -621,6 +623,43 @@ std::string handleDisplayStickyNotesRequest(const std::map<std::string, std::str
                "Content-Type: text/plain\r\n"
                "\r\n"
                "Error reading from file\r\n";
+    }
+}
+
+std::string handleDeleteNoteRequest(const std::map<std::string, std::string>& headers, const std::string& request_body) {
+    // Parsing the POST body to get the note ID
+    auto post_data = parseUrlEncodedFormData(request_body);
+    if (!post_data.count("id")) {
+        return "HTTP/1.1 400 Bad Request\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Missing note ID\r\n";
+    }
+    int note_id = std::stoi(post_data["id"]);
+
+    std::unique_lock<std::shared_mutex> lock(mtx);
+    const char *sql_delete = "DELETE FROM NOTES WHERE ID = ?;";
+    sqlite3_stmt *stmt;
+    bool success = false;
+
+    if (sqlite3_prepare_v2(db, sql_delete, -1, &stmt, 0) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, note_id);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            success = true;
+        }
+    }
+    sqlite3_finalize(stmt);
+
+    if (success) {
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Note deleted successfully\r\n";
+    } else {
+        return "HTTP/1.1 500 Internal Server Error\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Failed to delete note\r\n";
     }
 }
 
@@ -772,6 +811,8 @@ void handleClient(int client_socket, const sockaddr_in& client_address) {
                 }
             } else if (method == "GET" && uri == "/display_sticky_notes") {
                 response = handleDisplayStickyNotesRequest(headers);
+            } else if (method == "POST" && uri == "/delete_note") {
+                response = handleDeleteNoteRequest(headers, request_body);
             } else {
                 response = handleNotFoundRequest(headers);
             }

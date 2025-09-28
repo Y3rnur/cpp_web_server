@@ -63,3 +63,59 @@ document.addEventListener('DOMContentLoaded', () => {
         displayRandomQuote();   // Calling once the button is clicked
     }
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Add notification div if not present
+    if (!document.getElementById('notification')) {
+        const notif = document.createElement('div');
+        notif.id = 'notification';
+        notif.style.position = 'fixed';
+        notif.style.top = '30px';
+        notif.style.left = '50%';
+        notif.style.transform = 'translateX(-50%)';
+        notif.style.background = '#4CAF50';
+        notif.style.color = 'white';
+        notif.style.padding = '16px 32px';
+        notif.style.borderRadius = '8px';
+        notif.style.fontSize = '1.2em';
+        notif.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        notif.style.display = 'none';
+        notif.style.zIndex = '9999';
+        document.body.appendChild(notif);
+    }
+
+    function showNotification(msg) {
+        const notif = document.getElementById('notification');
+        notif.textContent = msg;
+        notif.style.display = 'block';
+        setTimeout(() => {
+            notif.style.display = 'none';
+        }, 2500);
+    }
+
+    document.querySelectorAll('.delete-button').forEach(function(button) {
+        button.addEventListener('click', function(e) {
+            const noteDiv = button.closest('.note');
+            const noteId = noteDiv.getAttribute('data-note-id');
+            if (!noteId) return;
+            if (confirm('Are you sure to delete the given message? This process is irreversible.')) {
+                fetch('/delete_note', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'id=' + encodeURIComponent(noteId)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        noteDiv.remove();
+                        showNotification('Message was deleted successfully!');
+                    } else {
+                        showNotification('Failed to delete the note.');
+                    }
+                })
+                .catch(() => showNotification('Error communicating with the server.'));
+            }
+        });
+    });
+});
