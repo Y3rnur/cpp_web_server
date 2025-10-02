@@ -590,7 +590,10 @@ std::string getAllNotesFromDB() {
             notes_html += "<div class=\"note\" data-note-id=\"" + std::to_string(id) + "\">";
             notes_html += "<p>" + std::string(reinterpret_cast<const char*>(content)) + "</p>";
             notes_html += "<span class=\"timestamp\">" + std::string(reinterpret_cast<const char*>(timestamp)) + "</span>";
+            notes_html += "<div class=\"note-actions\">";
+            notes_html += "<button class=\"edit-button\">✏️ Edit</button> ";
             notes_html += "<button class=\"delete-button\">🗑️ Delete</button>";
+            notes_html += "</div>";
             notes_html += "</div>";
         }
     }
@@ -660,6 +663,45 @@ std::string handleDeleteNoteRequest(const std::map<std::string, std::string>& he
                "Content-Type: text/plain\r\n"
                "\r\n"
                "Failed to delete note\r\n";
+    }
+}
+
+std::string handleEditNoteRequest(const std::map<std::string, std::string>& headers, const std::string& request_body) {
+    // Parsing the POST body to get the note ID and new content
+    auto post_data = parseUrlEncodedFormData(request_body);
+    if (!post_data.count("id") || !post_data.count("content")) {
+        return "HTTP/1.1 400 Bad Request\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Missing note ID or content\r\n";
+    }
+    int note_id = std::stoi(post_data["id"]);
+    std::string new_content = post_data["content"];
+
+    std::unique_lock<std::shared_mutex> lock(mtx);
+    const char *sql_update = "UPDATE NOTES SET CONTENT = ?, TIMESTAMP = datetime('now', 'localtime') WHERE ID = ?;";
+    sqlite3_stmt *stmt;
+    bool success = false;
+
+    if (sqlite3_prepare_v2(db, sql_update, -1, &stmt, 0) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, new_content.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 2, note_id);
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            success = sqlite3_changes(db) > 0; // Check for actual changes;
+        }
+    }
+    sqlite3_finalize(stmt);
+
+    if (success) {
+        return "HTTP/1.1 200 OK\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Note updated successfully!\r\n";
+    } else {
+        return "HTTP/1.1 404 Not Found\r\n"
+               "Content-Type: text/plain\r\n"
+               "\r\n"
+               "Note not found or update failed.\r\n";
     }
 }
 
@@ -813,6 +855,8 @@ void handleClient(int client_socket, const sockaddr_in& client_address) {
                 response = handleDisplayStickyNotesRequest(headers);
             } else if (method == "POST" && uri == "/delete_note") {
                 response = handleDeleteNoteRequest(headers, request_body);
+            } else if (method == "POST" && uri == "/update_note") {
+                response = handleEditNoteRequest(headers, request_body);
             } else {
                 response = handleNotFoundRequest(headers);
             }

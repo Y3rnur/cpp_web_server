@@ -65,9 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Add notification div if not present
-    if (!document.getElementById('notification')) {
-        const notif = document.createElement('div');
+    // Always create notification div once on page load
+    let notif = document.getElementById('notification');
+    if (!notif) {
+        notif = document.createElement('div');
         notif.id = 'notification';
         notif.style.position = 'fixed';
         notif.style.top = '30px';
@@ -84,8 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(notif);
     }
 
-    function showNotification(msg) {
-        const notif = document.getElementById('notification');
+    window.showNotification = function(msg) {
         notif.textContent = msg;
         notif.style.display = 'block';
         setTimeout(() => {
@@ -115,6 +115,73 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(() => showNotification('Error communicating with the server.'));
+            }
+        });
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.edit-button').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const noteDiv = button.closest('.note');
+            const noteId = noteDiv.getAttribute('data-note-id');
+            const contentP = noteDiv.querySelector('p');
+            const originalContent = contentP.textContent;
+
+            // Replacing the content with a textarea
+            contentP.style.display = 'none';
+            const textarea = document.createElement('textarea');
+            textarea.value = originalContent;
+            textarea.style.width = '100%';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save';
+            saveBtn.className = 'save-edit-btn';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.className = 'cancel-edit-btn';
+
+            noteDiv.insertBefore(textarea, contentP.nextSibling);
+            noteDiv.insertBefore(saveBtn, textarea.nextSibling);
+            noteDiv.insertBefore(cancelBtn, saveBtn.nextSibling);
+
+            saveBtn.addEventListener('click', function() {
+                const newContent = textarea.value.trim();
+                if (newContent == '') {
+                    alert('Note cannot be empty!');
+                    return;
+                }
+                
+                // Sending POST request to update the note
+                fetch('/update_note', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + encodeURIComponent(noteId) + '&content=' + encodeURIComponent(newContent)
+                })
+                .then(response => {
+                    if (response.ok) {
+                        contentP.textContent = newContent;
+                        cleanup();
+                        showNotification('Note updated successfully!');
+                        setTimeout(() => {
+                            location.reload();  // Reloading the page to reflect changes
+                        }, 700);
+                    } else {
+                        showNotification('Failed to update the note.');
+                    }
+                })
+                .catch(() => showNotification('Error communicating with the server.'));
+            });
+
+            cancelBtn.addEventListener('click', function() {
+                cleanup();
+            });
+
+            function cleanup() {
+                contentP.style.display = '';
+                textarea.remove();
+                saveBtn.remove();
+                cancelBtn.remove();
             }
         });
     });

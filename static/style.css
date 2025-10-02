@@ -233,3 +233,10 @@ h1.sticky-notes-title {
     font-family: 'Comic Sans MS', cursive, sans-serif;
     word-break: break-word;
 }
+
+.note-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 18px;
+    justify-content: flex-end;
+}
